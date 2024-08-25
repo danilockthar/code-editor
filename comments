@@ -1,0 +1,12 @@
+// No aplica por ahora: 
+            //Enter debe funcionar diferente dependiendo donde este el caret, si hay lineas debajo o no
+			// si hay lineas debajo, se debe mover el caret a la siguiente linea
+			// si no hay lineas debajo, se debe crear una nueva linea y mover el caret a la siguiente linea
+			// por ahora solo agregamos una nueva linea
+			/* 	caret.position.line += 1;
+			caret.position.column = 0;
+			caret.graphic.y += 20;
+			just_moved_caret = true;
+			app.canvas.height += 60;
+			console.log(app.canvas.height / 3 + 'px', '[app.canvas.height / 3 + px]');
+			app.canvas.style.height = app.canvas.height / 3 + 'px'; */

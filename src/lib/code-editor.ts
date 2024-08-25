@@ -27,7 +27,7 @@ function loadCSS(filename: string) {
 
 export const Editor = (instance: HTMLDivElement): EditorType => {
 	let editorState = [{ id: 1, text: '', isActive: true }];
-	let currentEvent = ''
+	let currentEvent = '';
 	let count = 0;
 	let settedLine = 0;
 
@@ -56,7 +56,7 @@ export const Editor = (instance: HTMLDivElement): EditorType => {
 	// Create a MutationObserver to track additions to the parent element
 	const observer = new MutationObserver((mutationsList) => {
 		for (let mutation of mutationsList) {
-			console.log({currentEvent}, '[observer-event]')
+			console.log({ currentEvent }, '[observer-event]');
 			if (mutation.type === 'childList') {
 				// check if nodes were removed and update the most recently added child if necessary
 				if (mutation.removedNodes.length > 0) {
@@ -177,7 +177,6 @@ export const Editor = (instance: HTMLDivElement): EditorType => {
 				event.preventDefault();
 				const text = event.clipboardData?.getData('text/plain');
 
-
 				document.execCommand('insertText', false, text);
 				editor.childNodes.forEach((node, i) => {
 					if (i + 1 === currentLine + 1) {
@@ -198,7 +197,6 @@ export const Editor = (instance: HTMLDivElement): EditorType => {
 			});
 
 			instance.addEventListener('input', (event: Event) => {
-				console.log('input event:', event.inputType);
 				if ((event as InputEvent).inputType === 'insertParagraph') {
 					console.log('new line');
 					editor.childNodes.forEach((node, i) => {
