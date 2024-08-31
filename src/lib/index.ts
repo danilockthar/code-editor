@@ -1,20 +1,25 @@
 // place files you want to import through the `$lib` alias in this folder.
-import { Application, BitmapText, Container } from 'pixi.js';
+import { Application, BitmapText, Container, EventEmitter } from 'pixi.js';
 
 /**
  * Handles the wheel event and updates the stage position accordingly.
  * @param e - The wheel event.
  * @param app - The PIXI Application instance.
  */
-export const wheelEvent = (e: WheelEvent, app: Application) => {
+export const wheelEvent = (
+	e: WheelEvent,
+	app: Application,
+	observer: EventEmitter<string | symbol>
+) => {
+	// Get the delta values for the wheel
 	const { deltaX, deltaY } = e;
+	const movementY = Math.abs(deltaY) * 0.5;
+	const movementX = Math.abs(deltaX) * 0.5;
+
 	if (deltaY > 0) {
 		// Scale the movement based on the intensity of the wheel event
-		let movementY = Math.abs(deltaY) * 0.5;
 		app.stage.y = app.stage.y - movementY;
 	} else {
-		let movementY = Math.abs(deltaY) * 0.5;
-
 		if (app.stage.y + movementY >= 0) {
 			app.stage.y = 0;
 		} else {
@@ -22,74 +27,55 @@ export const wheelEvent = (e: WheelEvent, app: Application) => {
 		}
 	}
 	if (deltaX > 0) {
-		let movementX = Math.abs(deltaX) * 0.5;
-
 		app.stage.x -= movementX;
 	} else {
-		let movementX = Math.abs(deltaX) * 0.5;
-
 		if (app.stage.x + movementX >= 0) {
 			app.stage.x = 0;
 		} else {
 			app.stage.x += movementX;
 		}
 	}
+
+	observer.emit('wheelEvent', {
+		movementX: Math.abs(app.stage.x),
+		movementY: Math.abs(app.stage.y)
+	});
 };
 
-/**
- * Array of special keys.
- * @readonly
- * @since 1.0.0
- * @example
- * const { SPECIAL_KEYS } = require('$lib');
- * console.log(SPECIAL_KEYS); // ['Shift', 'Control', 'Alt', 'Meta', ' ', 'ArrowDown', 'ArrowUp', 'ArrowRight', 'ArrowLeft', 'Enter', 'Tab', 'Backspace', 'CapsLock', 'Escape', 'PageUp', 'PageDown', 'End', 'Home', 'Insert', 'Delete', 'OS', 'ContextMenu', 'PrintScreen']
- */
-export const SPECIAL_KEYS = [
-	'Shift',
-	'Control',
-	'Alt',
-	'Meta',
-	'ArrowDown',
-	'ArrowUp',
-	'ArrowRight',
-	'ArrowLeft',
-	'Enter',
-	'Tab',
-	'Backspace',
-	'CapsLock',
-	'Escape',
-	'PageUp',
-	'PageDown',
-	'End',
-	'Home',
-	'Insert',
-	'Delete',
-	'OS',
-	'ContextMenu',
-	'PrintScreen'
-];
+/* type Events = {
+	textNodeChange: Container<BitmapText>;
+	lineNodeChange: string;
+	wheelEvent: { movementX: number; movementY: number };
+	// other event mappings can go here
+};
 
-export const createObserver = () => {
-	let events: { [key: string]: Set<any> } = {};
+type EventKey = keyof Events;
 
-	const subscribe = (event: string, callback: any) => {
+export type CustomObserver = {
+	subscribe<K extends EventKey>(event: K, callback: (data: Events[K]) => void): void;
+	unsubscribe<K extends EventKey>(event: K, callback: (data: Events[K]) => void): void;
+	emit<K extends EventKey>(event: K, data: Events[K]): void;
+	clear(): void;
+};
+export const createObserver = (): CustomObserver => {
+	let events: Partial<Record<EventKey, Set<(data: any) => void>>> = {};
+
+	const subscribe = <K extends EventKey>(event: EventKey, callback: (data: Events[K]) => void) => {
 		if (!events[event]) {
 			events[event] = new Set();
 		}
 		events[event].add(callback);
 	};
-	const unsubscribe = (event: string, callback: any) => {
+	const unsubscribe = <K extends EventKey>(
+		event: EventKey,
+		callback: (data: Events[K]) => void
+	) => {
 		if (events[event]) {
 			events[event].delete(callback);
 		}
 	};
-	/* const dispatch = (event: string, data: any) => {
-		if (!events[event]) {
-			return;
-		}
-		events[event]
-	}; */
-	const emit = (event: string, data: any) => {
+
+	const emit = <K extends EventKey>(event: EventKey, data: Events[K]) => {
 		if (!events[event]) return;
 
 		for (const callback of events[event]) {
@@ -106,13 +92,12 @@ export const createObserver = () => {
 	};
 
 	return {
-		events,
 		subscribe,
 		unsubscribe,
 		emit,
 		clear
 	};
-};
+}; */
 
 export const deleteCharAt = (str: string, index: number) => {
 	return str.slice(0, index - 1) + str.slice(index);
@@ -155,11 +140,11 @@ export const getTextNode = (textGroup: Container<BitmapText>, caretLinePos: numb
 	};
 };
 
-export const createTextNodeNavigator = (
+/* export const createTextNodeNavigator = (
 	textGroup: Container<BitmapText> | any[],
 	caretLinePos: number
 ) => {
-	let navigator = {
+	const navigator = {
 		current: Array.isArray(textGroup)
 			? textGroup[caretLinePos - 1]
 			: textGroup.children[caretLinePos - 1],
@@ -170,4 +155,4 @@ export const createTextNodeNavigator = (
 	};
 
 	return navigator;
-};
+}; */

@@ -3,10 +3,9 @@
 	import { onMount } from 'svelte';
 
 	let instance: HTMLDivElement;
-	let textarea: HTMLInputElement;
 
 	const editor = pixiEditor();
-	editor.onKeyPress((e: any) => {
+	editor.onKeyPress((e: KeyboardEvent) => {
 		console.log(e.key, '[keypress html]');
 	});
 
@@ -21,7 +20,12 @@
 
 <h1>Welcome to SvelteKit</h1>
 <!-- svelte-ignore a11y-no-noninteractive-tabindex -->
-<div tabindex="0" style="width: 500px;height:300px" id="instance" bind:this={instance}></div>
+<div
+	tabindex="0"
+	style="width: 500px;height:300px; outline: none;"
+	id="instance"
+	bind:this={instance}
+></div>
 <!-- <input bind:this={textarea} on:input={handleInput} /> -->
 <button on:click={() => editor.change('asd')}> CLICK!</button>
 

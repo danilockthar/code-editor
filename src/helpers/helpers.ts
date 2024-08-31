@@ -87,11 +87,11 @@ export const scrollSelectionIntoView = () => {
 	return { x, y };
 } */
 export function getCaretPosition() {
-	let selection = window.getSelection();
+	const selection = window.getSelection();
 	if (!selection || !selection.rangeCount) return null;
-	let range = selection.getRangeAt(0);
-	let caretNode = range.startContainer;
-	let caretOffset = range.startOffset;
+	const range = selection.getRangeAt(0);
+	const caretNode = range.startContainer;
+	const caretOffset = range.startOffset;
 	return { caretNode, caretOffset };
 }
 

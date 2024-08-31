@@ -1,33 +1,38 @@
-import { Application, BitmapText, Container, Graphics } from 'pixi.js';
+import { Application, BitmapText, Container, EventEmitter } from 'pixi.js';
 import { TextCursor } from './text-cursor';
-import { createObserver, wheelEvent } from '$lib';
+import { wheelEvent } from '$lib';
 import { CounterLine } from './counter-line';
+import { AXIS_Y_PLUS, VERTICAL_LINE_AXIS_X } from '$constants';
 
 type Options = {
-	width: number;
-	height: number;
+	width?: number;
+	fontSize?: number;
+	height?: number;
 };
 
 export type Editor = {
 	mount: (instance: HTMLDivElement) => Promise<void>;
 	change: (value: string) => void;
-	onKeyPress: any;
+	onKeyPress: (listenerFn: (event: KeyboardEvent) => void) => void;
 	keyup: () => void;
 	processWheelEvent: (e: WheelEvent) => void;
 };
 
-export const pixiEditor = (options?: Options): Editor => {
-	let bitmap_text: BitmapText;
-	let app: Application;
-	let timeout: number;
-	let listeners: any = [];
+type callbackFn = (event: KeyboardEvent) => void;
 
-	const observer = createObserver();
+export const pixiEditor = (options?: Options): Editor => {
+	const { fontSize = 15 } = options || {};
+	let bitmap_text: BitmapText;
+	let timeout: NodeJS.Timeout;
+	const listeners: Array<callbackFn> = [];
+
+	/* 	const observer = createObserver(); */
+	const observer = new EventEmitter();
 
 	let app_width: number;
 	let app_height: number;
 
-	app = new Application();
+	const app = new Application();
 
 	const editorShell = new Container({
 		isRenderGroup: true
@@ -35,7 +40,6 @@ export const pixiEditor = (options?: Options): Editor => {
 
 	const counterLineHandler = CounterLine({ observer, container: editorShell });
 
-	const textPositions = [];
 	// The application will create a renderer using WebGL, if possible,
 	// with a fallback to a canvas render. It will also setup the ticker
 	// and the root stage PIXI.Container
@@ -46,16 +50,22 @@ export const pixiEditor = (options?: Options): Editor => {
 	const bitmapTextRenderGroup: Container<BitmapText> = new Container({
 		isRenderGroup: true
 	});
-	const textCursorHandler = TextCursor(bitmapTextRenderGroup, { observer });
+	const textCursorHandler = TextCursor(bitmapTextRenderGroup, app, {
+		observer,
+		fontSize
+	});
 
-	const customListener = (event: any) => {
-		listeners.forEach((l: any) => l(event));
+	const customListener = (event: KeyboardEvent) => {
+		listeners.forEach((l: callbackFn) => l(event));
 	};
 
-	observer.subscribe('textNodeChange', (data: any) => {
-		console.log(data, '[data]');
-		counterLineHandler.update(data);
-	});
+	observer.on(
+		'textNodeChange',
+		(data: Container<BitmapText>) => {
+			counterLineHandler.update(data);
+		},
+		{ once: true }
+	);
 
 	return {
 		mount: async (instance: HTMLDivElement) => {
@@ -76,16 +86,12 @@ export const pixiEditor = (options?: Options): Editor => {
 			instance.addEventListener('wheel', (e) => {
 				e.preventDefault();
 				e.stopPropagation();
-				wheelEvent(e, app);
+				wheelEvent(e, app, observer);
 			});
 
 			instance.addEventListener('keydown', (e) => {
 				customListener(e);
 				e.preventDefault();
-				const isShiftPressed = e.shiftKey;
-				const isCommandPressed = e.metaKey;
-				const isCtrlPressed = e.ctrlKey;
-				const isAltPressed = e.altKey;
 
 				textCursorHandler.handlePressedKeys(e, bitmapTextRenderGroup);
 			});
@@ -107,23 +113,24 @@ export const pixiEditor = (options?: Options): Editor => {
 				text: '',
 				style: {
 					fontFamily: 'Courier New, monospace',
-					fontSize: 16,
+					fontSize,
 					align: 'left'
 				},
 				x: 24,
-				y: 0
+				y: AXIS_Y_PLUS
 			});
 
+			console.log(bitmap_text.width, '[bitmap_text.width]');
 			// linea izquierda del editor
-			let leftLine = new Graphics().rect(20, 0, 1, app.canvas.height).fill(0x0000ff);
 
-			editorShell.addChild(leftLine);
+			bitmapTextRenderGroup.y = 2;
+			editorShell.y = 3;
+
 			bitmapTextRenderGroup.addChild(bitmap_text);
+
 			if (observer) {
 				observer.emit('textNodeChange', bitmapTextRenderGroup);
 			}
-
-			/* render_counter_line(); */
 
 			app.stage.addChild(bitmapTextRenderGroup);
 			app.stage.addChild(editorShell);
@@ -131,23 +138,43 @@ export const pixiEditor = (options?: Options): Editor => {
 
 			textCursorHandler.start_ticker(app.ticker);
 
-			app.canvas.addEventListener('click', (e) => {
+			app.canvas.addEventListener('mousedown', (e) => {
 				const x = e.clientX - offsetX;
 				const y = e.clientY - offsetY;
-				console.log({ x, y });
+
+				textCursorHandler.handleMouseEvent(x, y, 'down');
+			});
+
+			app.canvas.addEventListener('mouseup', (e) => {
+				const x = e.clientX - offsetX;
+				const y = e.clientY - offsetY;
+				if (timeout) clearTimeout(timeout);
+				timeout = setTimeout(() => {
+					textCursorHandler.handlePressedKeys();
+				}, 300);
+				textCursorHandler.handleMouseEvent(x, y, 'up');
+			});
+			app.canvas.addEventListener('mousemove', (e) => {
+				const x = e.clientX - offsetX;
+
+				if (x > VERTICAL_LINE_AXIS_X) {
+					instance.style.cursor = 'text';
+				} else {
+					instance.style.cursor = 'default';
+				}
 			});
 		},
 		change: (value: string) => {
 			bitmap_text.text = value;
 			app.stage.y -= 10;
 		},
-		onKeyPress: (listenerFn: any) => {
+		onKeyPress: (listenerFn: (event: KeyboardEvent) => void) => {
 			listeners.push(listenerFn);
 		},
-		processWheelEvent: (e: WheelEvent) => {
-			e.preventDefault();
+		processWheelEvent: () => {
+			/* e.preventDefault();
 			e.stopPropagation();
-			wheelEvent(e, app);
+			wheelEvent(e, app, observer); */
 		},
 		keyup: () => {}
 	};

@@ -1,6 +1,13 @@
+// eslint-disable-next-line
+
 import { text } from '@sveltejs/kit';
-import { getCaretPosition, getContainingDiv } from '../helpers/helpers';
-import { editorStyleCss, lineColumnStyleCss, lineCountStyleCss, instanceStyleCss } from '../styles';
+import { getCaretPosition, getContainingDiv } from '../src/helpers/helpers';
+import {
+	editorStyleCss,
+	lineColumnStyleCss,
+	lineCountStyleCss,
+	instanceStyleCss
+} from '../src/styles';
 
 export type EditorType = {
 	new: () => void;

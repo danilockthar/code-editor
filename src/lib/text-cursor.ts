@@ -1,7 +1,21 @@
-import { Container, Graphics, Ticker, BitmapText } from 'pixi.js';
-import { SPACE_WIDTH } from '../helpers/constants';
-import { addCharAt, deleteCharAt, createTextNodeNavigator, SPECIAL_KEYS } from '$lib';
+import {
+	Container,
+	Graphics,
+	Ticker,
+	BitmapText,
+	Application,
+	type Renderer,
+	EventEmitter
+} from 'pixi.js';
+import { addCharAt, deleteCharAt } from '$lib';
 import Caret from './Caret';
+import {
+	AXIS_X_START,
+	AXIS_Y_PLUS,
+	CARET_HEIGHT,
+	LETTER_WIDTH_RATIO,
+	SPECIAL_KEYS
+} from '$constants';
 
 type TextCursorType = {
 	caretGroup: Container;
@@ -14,6 +28,7 @@ type TextCursorType = {
 		};
 		trigger?: (direction: string) => void;
 	};
+	handleMouseEvent: (x: number, y: number, action: string) => void;
 	handlePressedKeys: (
 		keyEvent?: KeyboardEvent,
 		bitmapTextRenderGroup?: Container<BitmapText>
@@ -22,50 +37,56 @@ type TextCursorType = {
 };
 
 type TextCursorOption = {
-	observer?: any;
-	initialState?: any[];
+	fontSize?: number;
+	observer?: EventEmitter<string | symbol>;
+	/* 	initialState?: any[]; */
 };
 
-const firstNode = {
+/* const firstNode = {
 	text: ''
-};
+}; */
 
 export const TextCursor = (
 	bitmapTextRenderGroup: Container<BitmapText>,
+	app: Application<Renderer>,
 	options: TextCursorOption = {}
 ): TextCursorType => {
-	const { observer = null, initialState = [firstNode] } = options;
+	const { observer = null, /* initialState = [firstNode],  */ fontSize = 14 } = options;
 
-	let state = [...initialState];
+	/* let state = [...initialState]; */
 	let justMovedCaret = false;
 	const caretGroup = new Container({
 		isRenderGroup: true,
-		x: 24,
-		y: 0
+		x: AXIS_X_START,
+		y: 3
 	});
 
-	const defaultCaret = Caret({ position: { line: 1, column: 0 } });
+	const defaultCaret = Caret({ position: { line: 1, column: 0 }, fontSize });
 
 	const updateBitmapTextRenderGroup = (firstPart: BitmapText[], secondPart: BitmapText[]) => {
 		bitmapTextRenderGroup!.removeChildren(0);
 		bitmapTextRenderGroup!.addChild(...firstPart, ...secondPart);
-		bitmapTextRenderGroup!.children.forEach((child, i) => (child.y = i * 20));
+		bitmapTextRenderGroup!.children.forEach(
+			(child, i) => (child.y = i * CARET_HEIGHT + AXIS_Y_PLUS)
+		);
 	};
 
 	caretGroup.addChild(defaultCaret.graphic);
 
-	const start_ticker = (app_ticker: any) => {
+	const start_ticker = (app_ticker: Ticker) => {
 		let elapsed = 0;
 		const blinkInterval = 30; // Frames between each blink (adjust for speed)
 		let isCaretVisible = true;
 
-		app_ticker.add((ticker: any) => {
+		app_ticker.add((ticker: Ticker) => {
 			elapsed += ticker.deltaTime;
+
 			if (justMovedCaret) {
 				isCaretVisible = true;
 				defaultCaret.graphic.visible = isCaretVisible;
 				return;
 			}
+
 			if (elapsed >= blinkInterval) {
 				isCaretVisible = !isCaretVisible;
 				defaultCaret.graphic.visible = isCaretVisible;
@@ -75,16 +96,16 @@ export const TextCursor = (
 	};
 
 	const handlePressedKeys = (keyEvent?: KeyboardEvent) => {
-		const nodeText = createTextNodeNavigator(bitmapTextRenderGroup, defaultCaret.position.line);
+		/* const nodeText = createTextNodeNavigator(bitmapTextRenderGroup, defaultCaret.position.line); */
 
 		if (!keyEvent) {
 			justMovedCaret = false;
 			return;
 		}
-		const isShiftPressed = keyEvent.shiftKey;
-		const isCommandPressed = keyEvent.metaKey;
+		/* const isShiftPressed = keyEvent.shiftKey;
+		const isCommandPressed = keyEvent.metaKey; */
 		const isCtrlPressed = keyEvent.ctrlKey;
-		const isAltPressed = keyEvent.altKey;
+		/* const isAltPressed = keyEvent.altKey; */
 
 		/**
 		 * This is normal writing (not special keys) start
@@ -95,11 +116,16 @@ export const TextCursor = (
 				return;
 			}
 
-			nodeText.current.text = addCharAt(
-				nodeText.current.text,
+			bitmapTextRenderGroup!.children[defaultCaret.position.line - 1].text = addCharAt(
+				bitmapTextRenderGroup!.children[defaultCaret.position.line - 1].text,
 				defaultCaret.position.column,
 				keyEvent.key
 			);
+			/* bitmapTextRenderGroup!.children[defaultCaret.position.line - 1].text = addCharAt(
+				bitmapTextRenderGroup!.children[defaultCaret.position.line - 1].text,
+				defaultCaret.position.column,
+				keyEvent.key
+			); */
 
 			defaultCaret.moveTo(defaultCaret.position.line, defaultCaret.position.column + 1);
 			justMovedCaret = true;
@@ -128,35 +154,45 @@ export const TextCursor = (
 			// si defaultCaret esta en columna 0 y en cualquier fila mayor a 1, deberia eliminar el nodo de texto
 			if (defaultCaret.position.column === 0 && defaultCaret.position.line > 1) {
 				// chequear si queda texto antes de eliminar el nodo de texto
-				if (nodeText.current.text.length === 0) {
+				if (bitmapTextRenderGroup!.children[defaultCaret.position.line - 1].text.length === 0) {
 					bitmapTextRenderGroup!.removeChildAt(actualNodeIndex);
 
 					bitmapTextRenderGroup!.children.forEach((child, i) => {
 						if (i >= defaultCaret.position.line - 1) {
-							child.y = i * 20;
+							child.y = i * CARET_HEIGHT;
 						}
 					});
-					defaultCaret.moveTo(actualNodeIndex, nodeText.prev.text.length + 1);
+					defaultCaret.moveTo(
+						actualNodeIndex,
+						bitmapTextRenderGroup!.children[defaultCaret.position.line - 2].text.length + 1
+					);
 				} else {
-					nodeText.prev.text += nodeText.current.text;
+					bitmapTextRenderGroup!.children[defaultCaret.position.line - 2].text +=
+						bitmapTextRenderGroup!.children[defaultCaret.position.line - 1].text;
 
 					bitmapTextRenderGroup!.removeChildAt(actualNodeIndex);
 
 					bitmapTextRenderGroup!.children.forEach((child, i) => {
 						if (i >= actualNodeIndex) {
-							child.y = i * 20;
+							child.y = i * CARET_HEIGHT;
 						}
 					});
-					defaultCaret.moveTo(actualNodeIndex, nodeText.prev.text.length + 1);
+					defaultCaret.moveTo(
+						actualNodeIndex,
+						bitmapTextRenderGroup!.children[defaultCaret.position.line - 2].text.length + 1
+					);
 				}
 			} else {
-				nodeText.current.text = deleteCharAt(nodeText.current.text, defaultCaret.position.column);
+				bitmapTextRenderGroup!.children[defaultCaret.position.line - 1].text = deleteCharAt(
+					bitmapTextRenderGroup!.children[defaultCaret.position.line - 1].text,
+					defaultCaret.position.column
+				);
 			}
 
 			if (defaultCaret.position.column > 0 && defaultCaret.position.line > 0) {
 				defaultCaret.moveTo(defaultCaret.position.line, defaultCaret.position.column - 1);
 			}
-			/* defaultCaret.trigger('left'); */
+
 			if (observer) {
 				observer.emit('textNodeChange', bitmapTextRenderGroup);
 			}
@@ -185,11 +221,11 @@ export const TextCursor = (
 				text: '',
 				style: {
 					fontFamily: 'Courier New, monospace',
-					fontSize: 16,
+					fontSize,
 					align: 'left'
 				},
-				x: 24,
-				y: defaultCaret.position.line * 20
+				x: AXIS_X_START,
+				y: defaultCaret.position.line * CARET_HEIGHT + AXIS_Y_PLUS
 			});
 
 			// SI CARET COLUMNA ES 0
@@ -202,24 +238,42 @@ export const TextCursor = (
 			} else {
 				// SI CARET LINE ES IGUAL A LA CANTIDAD DE NODOS DE TEXTO
 				if (defaultCaret.position.line === bitmapTextRenderGroup!.children.length) {
-					if (defaultCaret.position.column >= nodeText.current.text.length) {
+					if (
+						defaultCaret.position.column >=
+						bitmapTextRenderGroup!.children[defaultCaret.position.line - 1].text.length
+					) {
 						bitmapTextRenderGroup!.addChild(newOne);
 					} else {
-						newOne.text = nodeText.current.text.slice(defaultCaret.position.column);
-						nodeText.current.text = nodeText.current.text.slice(0, defaultCaret.position.column);
+						newOne.text = bitmapTextRenderGroup!.children[
+							defaultCaret.position.line - 1
+						].text.slice(defaultCaret.position.column);
+						bitmapTextRenderGroup!.children[defaultCaret.position.line - 1].text =
+							bitmapTextRenderGroup!.children[defaultCaret.position.line - 1].text.slice(
+								0,
+								defaultCaret.position.column
+							);
 						bitmapTextRenderGroup!.addChild(newOne);
 					}
 				} else {
 					// SI CARET COLUMNA ES MAYOR O IGUAL A LA CANTIDAD DE TEXTO DEL NODO DE TEXTO ACTUAL
-					if (defaultCaret.position.column >= nodeText.current.text.length) {
+					if (
+						defaultCaret.position.column >=
+						bitmapTextRenderGroup!.children[defaultCaret.position.line - 1].text.length
+					) {
 						const firstPart = bitmapTextRenderGroup!.children.slice(0, defaultCaret.position.line);
 						const secondPart = bitmapTextRenderGroup!.children.slice(defaultCaret.position.line);
 
 						firstPart.push(newOne);
 						updateBitmapTextRenderGroup(firstPart, secondPart);
 					} else {
-						newOne.text = nodeText.current.text.slice(defaultCaret.position.column);
-						nodeText.current.text = nodeText.current.text.slice(0, defaultCaret.position.column);
+						newOne.text = bitmapTextRenderGroup!.children[
+							defaultCaret.position.line - 1
+						].text.slice(defaultCaret.position.column);
+						bitmapTextRenderGroup!.children[defaultCaret.position.line - 1].text =
+							bitmapTextRenderGroup!.children[defaultCaret.position.line - 1].text.slice(
+								0,
+								defaultCaret.position.column
+							);
 
 						const firstPart = bitmapTextRenderGroup!.children.slice(0, defaultCaret.position.line);
 						const secondPart = bitmapTextRenderGroup!.children.slice(defaultCaret.position.line);
@@ -238,17 +292,21 @@ export const TextCursor = (
 			}
 		}
 
-		const is_shift_pressed = keyEvent.shiftKey;
+		/* const is_shift_pressed = keyEvent.shiftKey;
 		const is_command_pressed = keyEvent.metaKey;
 		const is_ctrl_pressed = keyEvent.ctrlKey;
-		const is_alt_pressed = keyEvent.altKey;
+		const is_alt_pressed = keyEvent.altKey; */
 		if (keyEvent.key === 'ArrowRight') {
 			if (
-				defaultCaret.position.column >= nodeText.current.text.length &&
+				defaultCaret.position.column >=
+					bitmapTextRenderGroup!.children[defaultCaret.position.line - 1].text.length &&
 				defaultCaret.position.line === bitmapTextRenderGroup.children.length
 			)
 				return;
-			if (defaultCaret.position.column >= nodeText.current.text.length) {
+			if (
+				defaultCaret.position.column >=
+				bitmapTextRenderGroup!.children[defaultCaret.position.line - 1].text.length
+			) {
 				defaultCaret.moveTo(defaultCaret.position.line + 1, 0);
 				justMovedCaret = true;
 				return;
@@ -259,7 +317,10 @@ export const TextCursor = (
 		if (keyEvent.key === 'ArrowLeft') {
 			if (defaultCaret.position.column === 0 && defaultCaret.position.line === 1) return;
 			if (defaultCaret.position.column === 0 && defaultCaret.position.line > 1) {
-				defaultCaret.moveTo(defaultCaret.position.line - 1, nodeText.prev.text.length);
+				defaultCaret.moveTo(
+					defaultCaret.position.line - 1,
+					bitmapTextRenderGroup!.children[defaultCaret.position.line - 2].text.length
+				);
 				justMovedCaret = true;
 				return;
 			}
@@ -273,22 +334,29 @@ export const TextCursor = (
 			// si el defaultCaret esta en la segunda linea, se puede mover hacia arriba
 			// si defaultCaret esta en la linea 2 significa que bitmapTextRenderGroup tiene al menos 1 elemento
 			if (defaultCaret.position.line === 1) return;
-			if (defaultCaret.position.column >= nodeText.prev.text.length) {
-				defaultCaret.moveTo(defaultCaret.position.line - 1, nodeText.prev.text.length);
+			if (
+				defaultCaret.position.column >=
+				bitmapTextRenderGroup!.children[defaultCaret.position.line - 2].text.length
+			) {
+				defaultCaret.moveTo(
+					defaultCaret.position.line - 1,
+					bitmapTextRenderGroup!.children[defaultCaret.position.line - 2].text.length
+				);
 				justMovedCaret = true;
 				return;
 			}
 			defaultCaret.moveTo(defaultCaret.position.line - 1, defaultCaret.position.column);
 		}
 		if (keyEvent.key === 'ArrowDown') {
-			console.log(defaultCaret.position, '[defaultCaret.position]');
-			console.log(
-				{ current: nodeText.current, prev: nodeText.prev, next: nodeText.next },
-				'[nodeText]'
-			);
 			if (defaultCaret.position.line === bitmapTextRenderGroup.children.length) return;
-			if (defaultCaret.position.column >= nodeText.next.text.length) {
-				defaultCaret.moveTo(defaultCaret.position.line + 1, nodeText.next.text.length);
+			if (
+				defaultCaret.position.column >=
+				bitmapTextRenderGroup!.children[defaultCaret.position.line].text.length
+			) {
+				defaultCaret.moveTo(
+					defaultCaret.position.line + 1,
+					bitmapTextRenderGroup!.children[defaultCaret.position.line].text.length
+				);
 				justMovedCaret = true;
 				return;
 			}
@@ -297,10 +365,34 @@ export const TextCursor = (
 		}
 	};
 
+	const handleMouseEvent = (x: number, y: number, action: string) => {
+		const [movementX, movementY] = [x + Math.abs(app.stage.x), y + Math.abs(app.stage.y)];
+		if (action === 'down') {
+			let clickedNode = Math.round((movementY + AXIS_Y_PLUS) / CARET_HEIGHT);
+			let columnIndex = Math.round((movementX - AXIS_X_START) / (fontSize * LETTER_WIDTH_RATIO));
+			if (clickedNode === 0) clickedNode = 1;
+			if (clickedNode > bitmapTextRenderGroup!.children.length)
+				clickedNode = bitmapTextRenderGroup!.children.length;
+
+			if (columnIndex > bitmapTextRenderGroup!.children[clickedNode - 1].text.length)
+				columnIndex = bitmapTextRenderGroup!.children[clickedNode - 1].text.length;
+
+			if (columnIndex < 0) columnIndex = 0;
+			defaultCaret.moveTo(clickedNode, columnIndex);
+			justMovedCaret = true;
+
+			return;
+		}
+
+		/* if (action === 'up') {
+		} */
+	};
+
 	return {
 		caretGroup,
 		caret: defaultCaret,
 		handlePressedKeys,
+		handleMouseEvent,
 		start_ticker
 	};
 };

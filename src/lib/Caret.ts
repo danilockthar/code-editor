@@ -1,9 +1,11 @@
-import { Graphics } from 'pixi.js';
-import { SPACE_WIDTH } from '../helpers/constants';
+import { CARET_HEIGHT, LETTER_WIDTH_RATIO } from '$constants';
+
+import { EventEmitter, Graphics } from 'pixi.js';
 
 type CaretOptions = {
-	observer?: any;
+	observer?: EventEmitter<string | symbol>;
 	color?: string;
+	fontSize?: number;
 	position?: {
 		line: number;
 		column: number;
@@ -11,17 +13,17 @@ type CaretOptions = {
 };
 
 const Caret = (options: CaretOptions) => {
-	const { observer = null, color = '0xffffff', position = { line: 1, column: 0 } } = options;
-	let caret = {
-		graphic: new Graphics().rect(0, 0, 1, 18).fill(0xffffff),
+	const { color = 0xffffff, position = { line: 1, column: 0 }, fontSize = 15 } = options;
+	const caret = {
+		graphic: new Graphics().rect(0, 0, 1, CARET_HEIGHT).fill(color),
 		linePositionMatrix: [0, 0],
 		position,
 		moveTo: (line: number, column: number) => {
 			console.log({ line, column }, '[moveTo]');
-			
+
 			caret.position = { line, column };
-			caret.graphic.y = (line - 1) * 20;
-			caret.graphic.x = column * SPACE_WIDTH;
+			caret.graphic.y = (line - 1) * CARET_HEIGHT;
+			caret.graphic.x = column * (fontSize * LETTER_WIDTH_RATIO);
 		}
 	};
 
