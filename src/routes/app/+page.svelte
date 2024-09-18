@@ -5,9 +5,9 @@
 	let instance: HTMLDivElement;
 
 	const editor = pixiEditor();
-	editor.onKeyPress((e: KeyboardEvent) => {
+/* 	editor.onKeyPress((e: KeyboardEvent) => {
 		console.log(e.key, '[keypress html]');
-	});
+	}); */
 
 	onMount(() => {
 		editor.mount(instance);
@@ -27,7 +27,7 @@
 	bind:this={instance}
 ></div>
 <!-- <input bind:this={textarea} on:input={handleInput} /> -->
-<button on:click={() => editor.change('asd')}> CLICK!</button>
+<!-- <button on:click={() => editor.change('asd')}> CLICK!</button> -->
 
 <!-- <style>
 	input {

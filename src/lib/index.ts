@@ -1,4 +1,5 @@
 // place files you want to import through the `$lib` alias in this folder.
+import { AXIS_Y_PLUS, CARET_HEIGHT } from '$constants';
 import { Application, BitmapText, Container, EventEmitter } from 'pixi.js';
 
 /**
@@ -9,26 +10,47 @@ import { Application, BitmapText, Container, EventEmitter } from 'pixi.js';
 export const wheelEvent = (
 	e: WheelEvent,
 	app: Application,
-	observer: EventEmitter<string | symbol>
+	observer: EventEmitter<string | symbol>,
+	options?: {
+		initialTextNodes: number;
+	}
 ) => {
+	const { initialTextNodes = 1 } = options || {};
 	// Get the delta values for the wheel
 	const { deltaX, deltaY } = e;
 	const movementY = Math.abs(deltaY) * 0.5;
 	const movementX = Math.abs(deltaX) * 0.5;
 
+	// si se mueve hacia abajo
 	if (deltaY > 0) {
 		// Scale the movement based on the intensity of the wheel event
-		app.stage.y = app.stage.y - movementY;
+
+		const offsetNodeText =
+			app.stage.getChildByLabel('textNodes')!.children.length > initialTextNodes
+				? app.stage.getChildByLabel('textNodes')!.children.length - initialTextNodes
+				: initialTextNodes;
+
+		if (offsetNodeText === initialTextNodes) return;
+		if (app.stage.y - movementY <= -CARET_HEIGHT * offsetNodeText) {
+			app.stage.y = -CARET_HEIGHT * offsetNodeText;
+		} else {
+			app.stage.y = app.stage.y - movementY;
+		}
 	} else {
+		// si se mueve hacia arriba
+
 		if (app.stage.y + movementY >= 0) {
 			app.stage.y = 0;
 		} else {
 			app.stage.y += movementY;
 		}
 	}
+	// si se mueve hacia la derecha
 	if (deltaX > 0) {
 		app.stage.x -= movementX;
 	} else {
+		// si se mueve hacia la izquierda
+
 		if (app.stage.x + movementX >= 0) {
 			app.stage.x = 0;
 		} else {
@@ -36,14 +58,14 @@ export const wheelEvent = (
 		}
 	}
 
-	observer.emit('wheelEvent', {
+	/* observer.emit('wheelEvent', {
 		movementX: Math.abs(app.stage.x),
 		movementY: Math.abs(app.stage.y)
-	});
+	}); */
 };
 
 /* type Events = {
-	textNodeChange: Container<BitmapText>;
+	TEXT_NODES_UPDATE: Container<BitmapText>;
 	lineNodeChange: string;
 	wheelEvent: { movementX: number; movementY: number };
 	// other event mappings can go here
@@ -138,6 +160,15 @@ export const getTextNode = (textGroup: Container<BitmapText>, caretLinePos: numb
 			return textGroup.children[caretLinePos];
 		}
 	};
+};
+
+let instance: EventEmitter<string | symbol>;
+
+export const getContextState = () => {
+	if (!instance) {
+		instance = new EventEmitter();
+	}
+	return instance;
 };
 
 /* export const createTextNodeNavigator = (

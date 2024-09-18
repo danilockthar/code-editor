@@ -7,14 +7,15 @@ import {
 	type Renderer,
 	EventEmitter
 } from 'pixi.js';
-import { addCharAt, deleteCharAt } from '$lib';
+import { addCharAt, deleteCharAt, getContextState } from '$lib';
 import Caret from './Caret';
 import {
-	AXIS_X_START,
 	AXIS_Y_PLUS,
 	CARET_HEIGHT,
+	EventEmitterEvents,
 	LETTER_WIDTH_RATIO,
-	SPECIAL_KEYS
+	SPECIAL_KEYS,
+	LAYOUT_STATE
 } from '$constants';
 
 type TextCursorType = {
@@ -38,7 +39,6 @@ type TextCursorType = {
 
 type TextCursorOption = {
 	fontSize?: number;
-	observer?: EventEmitter<string | symbol>;
 	/* 	initialState?: any[]; */
 };
 
@@ -51,15 +51,22 @@ export const TextCursor = (
 	app: Application<Renderer>,
 	options: TextCursorOption = {}
 ): TextCursorType => {
-	const { observer = null, /* initialState = [firstNode],  */ fontSize = 14 } = options;
+	const { fontSize = 14 } = options;
 
-	/* let state = [...initialState]; */
+	const observer = getContextState();
+
 	let justMovedCaret = false;
 	const caretGroup = new Container({
 		isRenderGroup: true,
-		x: AXIS_X_START,
+		x: LAYOUT_STATE.AXIS_X_START,
 		y: 3
 	});
+
+	if (observer) {
+		observer.on(EventEmitterEvents.LAYOUT_UPDATE, (data: any) => {
+			console.log('LAYOUT_UPDATE', data);
+		});
+	}
 
 	const defaultCaret = Caret({ position: { line: 1, column: 0 }, fontSize });
 
@@ -112,7 +119,7 @@ export const TextCursor = (
 		 */
 		if (!SPECIAL_KEYS.includes(keyEvent.key)) {
 			if (isCtrlPressed && keyEvent.key === 'v') {
-				console.log('CTRL + V is pressed');
+				/* console.log('CTRL + V is pressed'); */
 				return;
 			}
 
@@ -133,11 +140,11 @@ export const TextCursor = (
 		// This is normal writing (not special keys) end
 
 		if (keyEvent.key === ' ') {
-			console.log('SPACE is pressed');
+			/* console.log('SPACE is pressed'); */
 		}
 
 		if (keyEvent.key === 'Tab') {
-			console.log('TAB is pressed');
+			/* console.log('TAB is pressed'); */
 		}
 
 		/**
@@ -154,33 +161,26 @@ export const TextCursor = (
 			// si defaultCaret esta en columna 0 y en cualquier fila mayor a 1, deberia eliminar el nodo de texto
 			if (defaultCaret.position.column === 0 && defaultCaret.position.line > 1) {
 				// chequear si queda texto antes de eliminar el nodo de texto
-				if (bitmapTextRenderGroup!.children[defaultCaret.position.line - 1].text.length === 0) {
-					bitmapTextRenderGroup!.removeChildAt(actualNodeIndex);
+				const prevLength =
+					bitmapTextRenderGroup!.children[defaultCaret.position.line - 2].text.length;
+				bitmapTextRenderGroup!.children[defaultCaret.position.line - 2].text +=
+					bitmapTextRenderGroup!.children[defaultCaret.position.line - 1].text;
 
-					bitmapTextRenderGroup!.children.forEach((child, i) => {
-						if (i >= defaultCaret.position.line - 1) {
-							child.y = i * CARET_HEIGHT;
-						}
+				bitmapTextRenderGroup!.removeChildAt(actualNodeIndex);
+
+				bitmapTextRenderGroup!.children.forEach((child, i) => {
+					if (i >= actualNodeIndex) {
+						child.y = i * CARET_HEIGHT + AXIS_Y_PLUS;
+					}
+				});
+
+				defaultCaret.moveTo(actualNodeIndex, prevLength + 1);
+				if (observer) {
+					observer.emit(EventEmitterEvents.TEXT_NODES_UPDATE, {
+						textNodes: bitmapTextRenderGroup,
+						action: 'remove',
+						removedNodeIndex: actualNodeIndex
 					});
-					defaultCaret.moveTo(
-						actualNodeIndex,
-						bitmapTextRenderGroup!.children[defaultCaret.position.line - 2].text.length + 1
-					);
-				} else {
-					bitmapTextRenderGroup!.children[defaultCaret.position.line - 2].text +=
-						bitmapTextRenderGroup!.children[defaultCaret.position.line - 1].text;
-
-					bitmapTextRenderGroup!.removeChildAt(actualNodeIndex);
-
-					bitmapTextRenderGroup!.children.forEach((child, i) => {
-						if (i >= actualNodeIndex) {
-							child.y = i * CARET_HEIGHT;
-						}
-					});
-					defaultCaret.moveTo(
-						actualNodeIndex,
-						bitmapTextRenderGroup!.children[defaultCaret.position.line - 2].text.length + 1
-					);
 				}
 			} else {
 				bitmapTextRenderGroup!.children[defaultCaret.position.line - 1].text = deleteCharAt(
@@ -192,18 +192,12 @@ export const TextCursor = (
 			if (defaultCaret.position.column > 0 && defaultCaret.position.line > 0) {
 				defaultCaret.moveTo(defaultCaret.position.line, defaultCaret.position.column - 1);
 			}
-
-			if (observer) {
-				observer.emit('textNodeChange', bitmapTextRenderGroup);
-			}
 		}
 
 		/**
 		 * Enter key is pressed
 		 */
 		if (keyEvent.key === 'Enter') {
-			console.log(defaultCaret.position, '[defaultCaret.position]');
-
 			/**
 			 * Casos:
 			 *  caret esta en la columna 0 y no hay texto *1 - 1 y 2 pueden ser el mismo caso.
@@ -224,7 +218,7 @@ export const TextCursor = (
 					fontSize,
 					align: 'left'
 				},
-				x: AXIS_X_START,
+				x: LAYOUT_STATE.AXIS_X_START,
 				y: defaultCaret.position.line * CARET_HEIGHT + AXIS_Y_PLUS
 			});
 
@@ -288,7 +282,10 @@ export const TextCursor = (
 
 			justMovedCaret = true;
 			if (observer) {
-				observer.emit('textNodeChange', bitmapTextRenderGroup);
+				observer.emit(EventEmitterEvents.TEXT_NODES_UPDATE, {
+					textNodes: bitmapTextRenderGroup,
+					action: 'add'
+				});
 			}
 		}
 
@@ -333,6 +330,7 @@ export const TextCursor = (
 			// si el defaultCaret esta en la primera linea, no se puede mover hacia arriba
 			// si el defaultCaret esta en la segunda linea, se puede mover hacia arriba
 			// si defaultCaret esta en la linea 2 significa que bitmapTextRenderGroup tiene al menos 1 elemento
+			console.log('[UP]', { defaultCaret });
 			if (defaultCaret.position.line === 1) return;
 			if (
 				defaultCaret.position.column >=
@@ -343,10 +341,24 @@ export const TextCursor = (
 					bitmapTextRenderGroup!.children[defaultCaret.position.line - 2].text.length
 				);
 				justMovedCaret = true;
+				if (observer) {
+					observer.emit(EventEmitterEvents.CARET_MOVED, {
+						caretPosition: defaultCaret.position,
+						direction: 'up'
+					});
+				}
 				return;
 			}
 			defaultCaret.moveTo(defaultCaret.position.line - 1, defaultCaret.position.column);
+
+			if (observer) {
+				observer.emit(EventEmitterEvents.CARET_MOVED, {
+					caretPosition: defaultCaret.position,
+					direction: 'up'
+				});
+			}
 		}
+
 		if (keyEvent.key === 'ArrowDown') {
 			if (defaultCaret.position.line === bitmapTextRenderGroup.children.length) return;
 			if (
@@ -358,9 +370,21 @@ export const TextCursor = (
 					bitmapTextRenderGroup!.children[defaultCaret.position.line].text.length
 				);
 				justMovedCaret = true;
+				if (observer) {
+					observer.emit(EventEmitterEvents.CARET_MOVED, {
+						caretPosition: defaultCaret.position,
+						direction: 'down'
+					});
+				}
 				return;
 			}
 			defaultCaret.moveTo(defaultCaret.position.line + 1, defaultCaret.position.column);
+			if (observer) {
+				observer.emit(EventEmitterEvents.CARET_MOVED, {
+					caretPosition: defaultCaret.position,
+					direction: 'down'
+				});
+			}
 			justMovedCaret = true;
 		}
 	};
@@ -369,7 +393,9 @@ export const TextCursor = (
 		const [movementX, movementY] = [x + Math.abs(app.stage.x), y + Math.abs(app.stage.y)];
 		if (action === 'down') {
 			let clickedNode = Math.round((movementY + AXIS_Y_PLUS) / CARET_HEIGHT);
-			let columnIndex = Math.round((movementX - AXIS_X_START) / (fontSize * LETTER_WIDTH_RATIO));
+			let columnIndex = Math.round(
+				(movementX - LAYOUT_STATE.AXIS_X_START) / (fontSize * LETTER_WIDTH_RATIO)
+			);
 			if (clickedNode === 0) clickedNode = 1;
 			if (clickedNode > bitmapTextRenderGroup!.children.length)
 				clickedNode = bitmapTextRenderGroup!.children.length;
@@ -379,6 +405,9 @@ export const TextCursor = (
 
 			if (columnIndex < 0) columnIndex = 0;
 			defaultCaret.moveTo(clickedNode, columnIndex);
+			observer.emit(EventEmitterEvents.CARET_MOVED, {
+				caretPosition: defaultCaret.position,
+			});
 			justMovedCaret = true;
 
 			return;

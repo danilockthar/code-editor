@@ -37,6 +37,7 @@
     "@codemirror/lang-javascript": "^6.2.2",
     "@codemirror/state": "^6.4.1",
     "@codemirror/view": "^6.26.3",
+    "@sveltejs/adapter-node": "^5.2.3",
     "@tweenjs/tween.js": "^23.1.2",
     "@types/node": "^22.5.1",
     "codemirror": "^6.0.1",
